@@ -2,20 +2,20 @@ import rclpy
 import math
 from rclpy.node import Node
 
-from std_msgs.msg import String
+from std_msgs.msg import Int32
 
 class squared(Node):
 
     def __init__(self):
         super().__init__('squared')
-        
+
         self.subscription = self.create_subscription(
-            String,
-            'numbers'
-            self.listener_callback,
-            10)
+                Int32,
+                'numbers',
+                self.listener_callback,
+                10)
         self.subscription
-    
+
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%d"' % (msg.data ** 2))
 
