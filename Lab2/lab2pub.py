@@ -1,24 +1,24 @@
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import String
+from std_msgs.msg import Int32
 
 class talker(Node):
 
     def __init__(self):
         super().__init__('talker')
-        
-        self.publisher_ = self.create_publisher(String, 'numbers', 10)
+
+        self.publisher_ = self.create_publisher(Int32, 'numbers', 10)
 
         timer_period = 0.5
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.i = 0
-    
+
     def timer_callback(self):
-        msg = String()
-        msg.data = '%d' % self.i
-        self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
+        msg = Int32()
+        msg.data = self.i
+        self.publisher_.publish(msg)    
+        self.get_logger().info('Publishing: "%d"' % msg.data)
         self.i += 1
 
 def main(args=None):
@@ -32,3 +32,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+    
