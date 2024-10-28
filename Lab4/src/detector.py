@@ -19,7 +19,8 @@ class Detector(Node):
         
         self.scan_sub = self.create_subscription(
             LaserScan, 
-            '\scan', 
+            '/diff_drive/scan', 
+            self.scan_callback,
             10
         )
 
@@ -105,8 +106,8 @@ class Detector(Node):
         # What is the transformation from the Lidar --> Object?
         # Think in terms of 2D displacement
 
-        laser2object_msg.header.frame_id = "laser_frame" # Set the correct parent frame
-        laser2object_msg.child_frame_id = "object" # Set correct child frame
+        laser2object_msg.header.frame_id = self.latest_laser.header.frame_id # Set the correct parent frame
+        laser2object_msg.child_frame_id = "detected_object" # Set correct child frame
         
         laser2object_msg.transform.translation.x = distance
         laser2object_msg.transform.translation.y = 0.0
@@ -118,8 +119,8 @@ class Detector(Node):
 
         try:
             # Lookup transform
-            odom2laser_msg = self.tf_buffer.lookup_transform(
-                'odom', 'laser_frame', rclpy.time.Time()
+            transform_msg = self.tf_buffer.lookup_transform(
+                'diff_drive/odom', 'laser_frame', rclpy.time.Time()
             )
         except TransformException as ex:
             self.get_logger().warn(f'Obstacle transform not found: {ex}')
@@ -130,10 +131,10 @@ class Detector(Node):
         # functions to work with the robot: 'transform_to_matrix', 'multiply_transforms'
 
         # What order should the two transformations be multiplied?
-        odom2object_msg = self.multiply_transforms(odom2laser_msg, laser2object_msg)
+        odom2object_msg = self.multiply_transforms(transfrom_msg, laser2object_msg)
 
-        odom2object_msg.header.frame_id = "odom" # Set correct parent frame
-        odom2object_msg.child_frame_id = "object" # Set correct child frame
+        odom2object_msg.header.frame_id = "diff_drive/odom" # Set correct parent frame
+        odom2object_msg.child_frame_id = "detected_object" # Set correct child frame
         # Call the broadcaster
         self.tf_broadcaster.sendTransform(odom2object_msg)
 
