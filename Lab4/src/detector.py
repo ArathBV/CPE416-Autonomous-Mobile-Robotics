@@ -12,7 +12,7 @@ from tf2_ros import TransformException
 
 import numpy as np
 
-class Detector(Node):
+class detector(Node):
 
     def __init__(self):
         super().__init__('Detector')
@@ -120,7 +120,7 @@ class Detector(Node):
         try:
             # Lookup transform
             transform_msg = self.tf_buffer.lookup_transform(
-                'diff_drive/odom', 'laser_frame', rclpy.time.Time()
+                'diff_drive/odom', self.latest_laser.header.frame_id, rclpy.time.Time()
             )
         except TransformException as ex:
             self.get_logger().warn(f'Obstacle transform not found: {ex}')
@@ -140,7 +140,7 @@ class Detector(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ObstacleDetectorImprovedNode()
+    node = detector()
 
     rclpy.spin(node)
     
