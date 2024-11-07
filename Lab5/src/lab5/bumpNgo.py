@@ -4,6 +4,7 @@ import numpy as np
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import Twist
 
 import tf2_ros
 import tf2_geometry_msgs
@@ -12,30 +13,43 @@ from tf2_ros import TransformException
 
 import numpy as np
 
-
-class Detector(Node):
+class bumpNgo(Node):
 
     def __init__(self):
-        super().__init__('detector')
-        
+        super().__init__('bumpNgo')
+
+        # Distance Measurer
         self.scan_sub = self.create_subscription(
             LaserScan, 
             '/diff_drive/scan',
-            self.scan_callback,
+            self.scan_callback, 
             10
         )
+        # FSM States
+        self.stateCurr = "FORWARD"
+        self.state0 = "FORWARD"
+        self.state1 = "STOP"
+        self.state2 = "BACKWARD"
+        self.state3 = "FAILED"
+        self.state4 = "TURN"
 
-        # We will use these variables to listen to the ROS2 transformation tree
-        # and to broadcast our own transformation from Odom -> Object
+        # Timer for FSM callback function
+        self.publisher_ = self.create_publisher()
+        timer_period = 1.0
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+
+        # Forward and Turning Messages
+        self.turning = False
+        self.forward_msg = Twist()
+        self.turn_msg = Twist()
+
+        #ROS2 Transformation tree and Odom->Object
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.tf_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
-        # Arguments are:
-        # Period in seconds (float) | callback (callable)
-        self.timer = self.create_timer(1.0, self.process_scan)
-
         self.latest_laser = LaserScan()
+        return
 
     def transform_to_matrix(self, transform):
         # Convert a Transform message to a 4x4 transformation matrix
@@ -81,11 +95,6 @@ class Detector(Node):
 
         return result_transform
     
-    def scan_callback(self, msg):
-        # Copy the data from the laser scanner into member variable
-        self.latest_laser = msg
-        
-
     def process_scan(self):
         # Do nothing if there is no data from the laser yet
         if not self.latest_laser.ranges:
@@ -109,7 +118,7 @@ class Detector(Node):
             laser2object_msg.transform.rotation.z = 0.0
             laser2object_msg.transform.rotation.w = 1.0            
 
-            laser2object_msg.header.frame_id = self.latest_laser.header.frame_id# Set the correct parent frame
+            laser2object_msg.header.frame_id = self.latest_laser.header.frame_id # Set the correct parent frame
             laser2object_msg.child_frame_id = 'detected_obstacle' # Set correct child frame
 
             try:
@@ -132,12 +141,17 @@ class Detector(Node):
 
             self.tf_broadcaster.sendTransform(odom2object_msg)
 
+    def scan_callback(self):
+        #self.latest_laser = msg
+        
+
+
 def main(args=None):
     rclpy.init(args=args)
-    node = Detector()
+    node = bumpNgo()
 
     rclpy.spin(node)
-    
+
     node.destroy_node()
     rclpy.shutdown()
 
