@@ -24,7 +24,7 @@ class bumpNgo(Node):
         # Timer for FSM callback function
         self.timer = self.create_timer(1.0, self.timer_callback)
 
-        # Initialize FSM State
+        # Initialize FSM States
         self.stateCurr = "FORWARD"
         self.timertick = 0
 
@@ -45,6 +45,7 @@ class bumpNgo(Node):
         # Update latest laser data
         self.latest_laser = msg
 
+
     def timer_callback(self):
         # Check if we have valid laser data
         if self.latest_laser is None or not self.latest_laser.ranges:
@@ -52,13 +53,15 @@ class bumpNgo(Node):
             return
 
         # Get the central distance from the laser data
-        distance = self.latest_laser.ranges[len(self.latest_laser.ranges) // 2]
+        #distance = self.latest_laser.ranges[len(self.latest_laser.ranges) // 2]
+        distance = min(self.latest_laser.ranges[160:480])
+        self.get_logger().info(f"size of lasers: {len(self.latest_laser.ranges)}")
         self.get_logger().info(f"Current distance to obstacle: {distance}")
 
         # FSM Handling
         # Forward State
         if self.stateCurr == "FORWARD":
-            if distance > 1.5:  # Adjust this threshold as needed
+            if distance > 1.25:  # Adjust this threshold as needed
                 self.forward_msg.linear.x = 4.0
                 self.publisher_.publish(self.forward_msg)
                 self.get_logger().info("Robot Moving Forward. State = Forward")
@@ -67,7 +70,6 @@ class bumpNgo(Node):
                 self.forward_msg.linear.x = -1.0
                 self.publisher_.publish(self.forward_msg)
                 self.stateCurr = "BACKWARD"
-
         # Backward State
         elif self.stateCurr == "BACKWARD":
             self.timertick += 1
@@ -79,11 +81,10 @@ class bumpNgo(Node):
                 self.publisher_.publish(self.forward_msg)
                 self.get_logger().info("Moved Backward. State = Turn")
                 self.stateCurr = "TURN"
-
         # Turn State
         elif self.stateCurr == "TURN":
-            if distance < 2.0:
-                if self.turns >= 12:
+            if distance < 1.5 and distance > 1.25:
+                if self.turns >= 18:
                     self.get_logger().info("Obstacle in all directions. State = Stop")
                     self.stateCurr = "STOP"
                     self.turns = 0
@@ -92,18 +93,21 @@ class bumpNgo(Node):
                     self.publisher_.publish(self.turn_msg)
                     self.get_logger().info("Turning detecting open space. State = Turn")
                     self.turns += 1
+            elif distance < 1.25:
+                self.turn_msg.angular.z = 0.0
+                self.publisher_.publish(self.turn_msg)
+                self.get_logger().info("Obstacle hit, Move Backwards. State = Backward")
+                self.stateCurr = "BACKWARD"
             else:
                 self.get_logger().info("Found clearance. State = Forward")
                 self.stateCurr = "FORWARD"
                 self.turns = 0
-
         # Stop State
         elif self.stateCurr == "STOP":
             self.get_logger().info("Robot stopped due to obstacles.")
             self.forward_msg.linear.x = 0.0
             self.publisher_.publish(self.forward_msg)
-
-        # Failure State
+        # Failed State
         elif self.stateCurr == "FAILED":
             self.get_logger().error("LaserScan failure detected. Exiting program.")
             self.forward_msg.linear.x = 0.0
