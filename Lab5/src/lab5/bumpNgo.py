@@ -21,10 +21,11 @@ class bumpNgo(Node):
         # Distance Measurer
         self.scan_sub = self.create_subscription(
             LaserScan, 
-            '/diff_drive/scan',
+            'diff_drive/scan',
             self.scan_callback, 
             10
         )
+
         # FSM States
         self.stateCurr = "FORWARD"
         self.state0 = "FORWARD"
@@ -34,14 +35,20 @@ class bumpNgo(Node):
         self.state4 = "TURN"
 
         # Timer for FSM callback function
-        self.publisher_ = self.create_publisher()
+        self.publisher_ = self.create_publisher(
+            Twist,
+            'diff_drive/cmd_vel',
+            10)
+
         timer_period = 1.0
         self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.timertick = 0
 
         # Forward and Turning Messages
         self.turning = False
         self.forward_msg = Twist()
         self.turn_msg = Twist()
+        self.turns = 0
 
         #ROS2 Transformation tree and Odom->Object
         self.tf_buffer = tf2_ros.Buffer()
@@ -127,6 +134,7 @@ class bumpNgo(Node):
 
             except TransformException as ex:
                 self.get_logger().warn(f'Obstacle transform not found: {ex}')
+                self.stateCurr = self.state1
                 return
 
             # Its usually best not to work with the gemoetry_msgs message types directly
@@ -142,10 +150,45 @@ class bumpNgo(Node):
             self.tf_broadcaster.sendTransform(odom2object_msg)
 
     def scan_callback(self):
-        #self.latest_laser = msg
+        if self.stateCurr == "FORWARD":
+            self.forward_msg.linear.x = 1.0
+            distance = self.latest_laser.ranges[len(self.latest_laser.ranges) // 2]
+            # Change to Backwards Distance
+            if distance == 0.0:
+                self.get_logger().info('Robot Bumped into Object. State = Backward')
+                self.stateCurr = self.state2
+            self.get_logger().info('Robot Moving Forward. State = Forward')
+
+        elif self.stateCurr == "BACKWARD":
+            self.timertick += 1
+            self.forward_msg.linear.x = -1.0
+            if self.timertick % 2 == 0:
+                self.timertick = 0
+                self.forward_msg.linear.x = 0.0
+                self.get_logger().info("Robot Moved Backward for 2 sec. State = Turn")
+                self.stateCurr = self.state4
+            self.get_logger().info("Robot Moving Backwards. State = Backward")
+
+        elif self.stateCurr == "STOP":
+            self.get_logger().info("Robot error occured, unable to move. State = Stop")
+            return
+        elif self.stateCurr == "TURN":
+            # Total of 360/45 = 8 turns to check
+            # 45 degree turns = 0.707 rad/s
+            distance = self.latest_laser.ranges[len(self.latest_laser.ranges) // 2]
+            if distance < 4.0:
+                if self.turns == 8:
+                    self.stateCurr = self.state1
+                    self.get_logger().info("Robot unable to proceed. State = Stop")
+                    self.turns = 0
+                else:
+                    self.turn_msg.angular.z = 0.707
+                    self.get_logger().info("Robot turns 45 deg to check for Clearance. State = Turn")
+                    self.turns += 1
+            else:
+                self.get_logger().info("Robot found clearance. State = Forward")
+                self.stateCurr = self.state0
         
-
-
 def main(args=None):
     rclpy.init(args=args)
     node = bumpNgo()
