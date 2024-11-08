@@ -12,11 +12,11 @@ class bumpNgo(Node):
 
         # Subscribe to LaserScan data
         self.scan_sub = self.create_subscription(
-            LaserScan,
-            'diff_drive/scan',
-            self.scan_callback,
-            10
-        )
+                LaserScan,
+                'diff_drive/scan',
+                self.scan_callback,
+                10
+                )
 
         # Publisher for Twist commands
         self.publisher_ = self.create_publisher(Twist, 'diff_drive/cmd_vel', 10)
@@ -40,23 +40,22 @@ class bumpNgo(Node):
         self.tf_broadcaster = StaticTransformBroadcaster(self)
 
         # LaserScan data placeholder
-        self.latest_laser = None
+        self.latest_laser = LaserScan()
 
     def scan_callback(self, msg):
         # Update latest laser data
         self.latest_laser = msg
 
     def timer_callback(self):
-        # Check LaserScan data
-        if self.latest_laser is None or not self.latest_laser.ranges:
-            self.get_logger().error("LaserScan failed. Ending program.")
-            self.stateCurr = "FAILED"
+        if not self.latest_laser.ranges:
             return
+
+        distance = self.latest_laser.ranges[len(self.latest_laser.ranges)//2]
 
         # FSM Handling
         if self.stateCurr == "FORWARD":
             distance = self.latest_laser.ranges[len(self.latest_laser.ranges) // 2]
-            if distance > 0.0:
+            if distance > 1:
                 self.forward_msg.linear.x = 1.0
                 self.publisher_.publish(self.forward_msg)
                 self.get_logger().info("Robot Moving Forward. State = Forward")
@@ -97,7 +96,7 @@ class bumpNgo(Node):
             self.get_logger().info("Robot stopped due to obstacles.")
             self.forward_msg.linear.x = 0.0
             self.publisher_.publish(self.forward_msg)
-        
+
         elif self.stateCurr == "FAILED":
             self.get_logger().error("LaserScan failure detected. Exiting program.")
             self.forward_msg.linear.x = 0.0
