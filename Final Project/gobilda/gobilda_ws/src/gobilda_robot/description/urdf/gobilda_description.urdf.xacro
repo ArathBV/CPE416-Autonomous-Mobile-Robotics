@@ -41,6 +41,28 @@
       </inertial> -->
   </link>
 
+  
+
+ <!--Lidar Joint-->
+  <joint name="lidar_sensor" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar"/>
+    <origin xyz="0, 0, 0.127">
+  </joint>
+
+  <link name="lidar">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.02">
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.1">
+      <origin xyz="0 0 0.127">
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0">
+    </inertial>
+  </link> 
+
   <joint name="left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="left_wheel"/>
